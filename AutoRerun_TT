@@ -1,0 +1,301 @@
+/*----------------------------------------------------------------------------*/
+/*                                                                            */
+/*    Module:       main.cpp                                                  */
+/*    Author:       C:\Users\Robotics1                                        */
+/*    Created:      Thu Jan 02 2020                                           */
+/*    Description:  V5 project                                                */
+/*                                                                            */
+/*----------------------------------------------------------------------------*/
+
+// ---- START VEXCODE CONFIGURED DEVICES ----
+// ---- END VEXCODE CONFIGURED DEVICES ----
+
+#include "vex.h"
+#include <cstdio>
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+
+competition Competition;
+
+vex::controller    Controller1 = vex::controller();
+ 
+//vex::brain         Brain;
+
+// Start of declaring motors
+
+vex::motor  frontLeft     = vex::motor(vex::PORT1, vex::gearSetting::ratio18_1, false);
+vex::motor  backLeft      = vex::motor(vex::PORT2, vex::gearSetting::ratio18_1, false);
+vex::motor  frontRight    = vex::motor(vex::PORT7, vex::gearSetting::ratio18_1, true);
+vex::motor  backRight     = vex::motor(vex::PORT5, vex::gearSetting::ratio18_1, true);
+vex::motor  armLeft       = vex::motor(vex::PORT8, vex::gearSetting::ratio36_1, true);
+vex::motor  armRight      = vex::motor(vex::PORT9, vex::gearSetting::ratio36_1, false);
+vex::motor  armBottom     = vex::motor(vex::PORT15, vex::gearSetting::ratio36_1, false);
+vex::motor  claw          = vex::motor(vex::PORT19, vex::gearSetting::ratio36_1, false);
+
+// End of declaring motors
+
+using namespace vex;
+
+// Start of autonomous index
+
+// Big blue zone
+int bB[750][8] = {};
+
+// Big red zone
+int bR[750][8] = {};
+
+// Small zones on
+// both sides
+int sA[750][8] = {};
+
+// End of autonomous index
+
+std::ofstream ofs;
+
+std::string toString(int val)
+{
+  std::stringstream stream;
+  stream << val;
+  return stream.str();
+}
+
+std::string formatToString(int num){
+  if(num == 100){
+    return "100,";
+  } else if((num>=10) && (num <10)){
+    return (toString(num) + ",");
+  } else {
+    return (toString(num) + ",");
+  }
+}
+
+// Putting motor values into a spot in a set. Later, the robot will draw from the set, 
+// based on the motor's position in the set. For instance, let us assume that motor
+// x is assigned to position 2 in the set. A set that reads {50, 50, 100, 100, 25, 75},
+// will assign the value 100 to motor x. 
+
+void runMappedAuto(int start, int finish, int auton[750][8]){
+  int i = start;
+  while(i < finish){
+    if(auton[i][0] != 0){
+      frontLeft.spin(vex::directionType::fwd, auton[i][0], vex::velocityUnits::pct);
+    } else {
+      frontLeft.stop();
+    }
+
+    if(auton[i][1] != 0){
+      backLeft.spin(vex::directionType::fwd, auton[i][1], vex::velocityUnits::pct);
+    } else {
+      backLeft.stop();
+    }
+
+    if(auton[i][2] != 0){
+      frontRight.spin(vex::directionType::fwd, auton[i][2], vex::velocityUnits::pct);
+    } else {
+      frontRight.stop();
+    }
+
+    if(auton[i][3] != 0){
+      backRight.spin(vex::directionType::fwd, auton[i][3], vex::velocityUnits::pct);
+    } else {
+      backRight.stop();
+    }
+
+    if(auton[i][4] != 0){
+      armLeft.spin(vex::directionType::fwd, auton[i][4], vex::velocityUnits::pct);
+    } else {
+      armLeft.stop();
+    }
+
+    if(auton[i][5] != 0){
+      armRight.spin(vex::directionType::fwd, auton[i][5], vex::velocityUnits::pct);
+    } else {
+      armRight.stop();
+    }
+
+    if(auton[i][6] != 0){
+      armBottom.spin(vex::directionType::fwd, auton[i][6], vex::velocityUnits::pct);
+    } else {
+      armBottom.stop();
+    }
+
+    if(auton[i][7] != 0){
+      claw.spin(vex::directionType::fwd, auton[i][6], vex::velocityUnits::pct);
+    } else {
+      claw.stop();
+    }
+    vex::task::sleep(20);
+    i++;
+  }
+}
+
+// Stops motors before autonomous
+
+void pre_auton( void ) {
+  frontLeft.stop(vex::brakeType::brake);
+  backLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  armLeft.stop(vex::brakeType::brake);
+  armRight.stop(vex::brakeType::brake);
+  claw.stop(vex::brakeType::brake);
+}
+
+// Stops motors, then starts to run the autonomous
+// program written above
+
+void autonomous( void ) {
+  frontLeft.stop(vex::brakeType::brake);
+  backLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  armLeft.stop(vex::brakeType::brake);
+  armRight.stop(vex::brakeType::brake);
+  claw.stop(vex::brakeType::brake);
+  runMappedAuto(0, 750, bB);
+}
+
+
+void usercontrol( void ) {
+
+
+  while (true) {
+    if(Controller1.ButtonA.pressing()){
+      ofs.open("auto1.txt", std::ofstream::out);
+      int i = 0;
+      while(true && i < 750){
+        if(Brain.SDcard.isInserted()){
+            if((abs(Controller1.Axis4.value()) > 10 || (abs(Controller1.Axis3.value()) >10))){
+              int leftSideValue = Controller1.Axis3.value() + Controller1.Axis4.value();
+              leftSideValue = .0001*pow(leftSideValue,3);
+              int rightSideValue = Controller1.Axis3.value() - Controller1.Axis4.value();
+              rightSideValue = .0001*pow(rightSideValue,3);
+
+              frontLeft.spin(vex::directionType::fwd, leftSideValue, vex::velocityUnits::pct);
+              backLeft.spin(vex::directionType::fwd, leftSideValue, vex::velocityUnits::pct);
+              frontRight.spin(vex::directionType::fwd, rightSideValue, vex::velocityUnits::pct);
+              backRight.spin(vex::directionType::fwd, rightSideValue, vex::velocityUnits::pct);
+            } else {
+              frontLeft.stop(vex::brakeType::brake);
+              backLeft.stop(vex::brakeType::brake);
+              frontRight.stop(vex::brakeType::brake);
+              backRight.stop(vex::brakeType::brake);
+            }
+
+
+          if(Controller1.ButtonR2.pressing()){
+            if(abs(Controller1.Axis4.value()) > 10){
+              frontLeft.spin(vex::directionType::fwd, Controller1.Axis4.value(), vex::velocityUnits::pct);
+              backLeft.spin(vex::directionType::fwd, -Controller1.Axis4.value(), vex::velocityUnits::pct);
+              frontRight.spin(vex::directionType::fwd, -Controller1.Axis4.value(), vex::velocityUnits::pct);
+              backRight.spin(vex::directionType::fwd, Controller1.Axis4.value(), vex::velocityUnits::pct);
+            } else {
+              frontLeft.stop(vex::brakeType::brake);
+              backLeft.stop(vex::brakeType::brake);
+              frontRight.stop(vex::brakeType::brake);
+              backRight.stop(vex::brakeType::brake);
+            }
+          }
+
+          if ((Controller1.Axis2.value()) > 30){
+            armLeft.spin(vex::directionType::fwd, -2*Controller1.Axis2.value(), vex::velocityUnits::pct);
+            armRight.spin(vex::directionType::fwd, -2*Controller1.Axis2.value(), vex::velocityUnits::pct);
+            armBottom.spin(vex::directionType::fwd, -2*Controller1.Axis2.value(), vex::velocityUnits::pct);
+          } else if((Controller1.Axis2.value()) < -30){
+            armLeft.spin(vex::directionType::fwd, -0.25*Controller1.Axis2.value(), vex::velocityUnits::pct);
+            armRight.spin(vex::directionType::fwd, -0.25*Controller1.Axis2.value(), vex::velocityUnits::pct);
+            armBottom.spin(vex::directionType::fwd, -0.25*Controller1.Axis2.value(), vex::velocityUnits::pct);
+          } else {
+            armLeft.stop(vex::brakeType::hold);
+            armRight.stop(vex::brakeType::hold);
+            armBottom.stop(vex::brakeType::hold);
+          }
+
+          if (Controller1.ButtonL1.pressing()){
+            claw.spin(vex::directionType::fwd, 50, vex::velocityUnits::pct);
+          } else if (Controller1.ButtonR1.pressing()){
+            claw.spin(vex::directionType::fwd, -50, vex::velocityUnits::pct);
+          } else {
+            claw.stop(vex::brakeType::brake);
+          }
+            
+            ofs << "{";
+              if((abs(Controller1.Axis4.value()) > 10 || (abs(Controller1.Axis3.value()) >10))){
+                ofs << formatToString(Controller1.Axis3.position(percentUnits::pct) + Controller1.Axis4.position(percentUnits::pct));
+                ofs << formatToString(Controller1.Axis3.position(percentUnits::pct) + Controller1.Axis4.position(percentUnits::pct));
+                ofs << formatToString(Controller1.Axis3.position(percentUnits::pct) - Controller1.Axis4.position(percentUnits::pct));
+                ofs << formatToString(Controller1.Axis3.position(percentUnits::pct) - Controller1.Axis4.position(percentUnits::pct));
+              } else {
+                ofs << formatToString(0);
+                ofs << formatToString(0);
+                ofs << formatToString(0);
+                ofs << formatToString(0);
+              }
+            
+            if(Controller1.ButtonR2.pressing()){
+              if(abs(Controller1.Axis4.value()) > 10){
+                ofs << formatToString(Controller1.Axis4.position(percentUnits::pct));
+                ofs << formatToString(-Controller1.Axis4.position(percentUnits::pct));
+                ofs << formatToString(-Controller1.Axis4.position(percentUnits::pct));
+                ofs << formatToString(Controller1.Axis4.position(percentUnits::pct));
+              } else {
+                ofs << formatToString(0);
+                ofs << formatToString(0);
+                ofs << formatToString(0);
+                ofs << formatToString(0);
+              }
+            }
+
+            if((Controller1.Axis2.value()) > 30){
+              ofs << formatToString(-2*Controller1.Axis2.position(percentUnits::pct));
+              ofs << formatToString(-2*Controller1.Axis2.position(percentUnits::pct));
+              ofs << formatToString(-2*Controller1.Axis2.position(percentUnits::pct));
+            } else if((Controller1.Axis2.value()) < -30){
+              ofs << formatToString(-0.25*Controller1.Axis2.position(percentUnits::pct));
+              ofs << formatToString(-0.25*Controller1.Axis2.position(percentUnits::pct));
+              ofs << formatToString(-0.25*Controller1.Axis2.position(percentUnits::pct));
+            } else {
+              ofs << formatToString(0);
+              ofs << formatToString(0);
+              ofs << formatToString(0);
+            }
+
+            if(Controller1.ButtonL1.pressing()){
+              ofs << formatToString(50);
+            } else if(Controller1.ButtonR1.pressing()){
+              ofs << formatToString(-50);
+            } else {
+              ofs << formatToString(0);
+            }
+
+            ofs << "}" ;
+
+        } else {
+        Brain.Screen.print('N');
+      }
+
+      vex::task::sleep(20);
+      i++;
+      }
+
+      ofs.close();
+    }
+  }
+
+  
+}
+
+
+
+int main() {
+    Competition.autonomous ( autonomous );
+    Competition.drivercontrol( usercontrol );
+
+    pre_auton();
+
+    while(1) {
+      vex::task::sleep(100);
+    }
+}
