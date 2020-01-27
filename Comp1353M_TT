@@ -1,0 +1,335 @@
+#include "vex.h"
+ 
+using namespace vex;
+
+// A global instance of competition
+competition Competition;
+
+vex::controller    Controller1 = vex::controller();
+
+ 
+//vex::brain         Brain;
+
+vex::motor  frontLeft     = vex::motor(vex::PORT1, vex::gearSetting::ratio18_1, false);
+vex::motor  backLeft      = vex::motor(vex::PORT2, vex::gearSetting::ratio18_1, false);
+vex::motor  frontRight    = vex::motor(vex::PORT7, vex::gearSetting::ratio18_1, true);
+vex::motor  backRight     = vex::motor(vex::PORT5, vex::gearSetting::ratio18_1, true);
+vex::motor  claw          = vex::motor(vex::PORT19, vex::gearSetting::ratio36_1, false);
+vex::motor  armLeft       = vex::motor(vex::PORT8, vex::gearSetting::ratio36_1, true);
+vex::motor  armRight      = vex::motor(vex::PORT9, vex::gearSetting::ratio36_1, false);
+vex::motor  armBottom     = vex::motor(vex::PORT15, vex::gearSetting::ratio36_1, false);
+
+
+ 
+void newManualDriveControl(){
+  if(Controller1.ButtonR2.pressing()){
+    // Drive code for strafing
+    if(abs(Controller1.Axis4.value()) > 10){
+      int axisFour = Controller1.Axis4.value();
+      axisFour = .0001*pow(axisFour,3);
+      backLeft.spin(vex::directionType::fwd, -axisFour , vex::velocityUnits::pct);
+      frontRight.spin(vex::directionType::fwd, -axisFour, vex::velocityUnits::pct);
+      frontLeft.spin(vex::directionType::fwd, axisFour, vex::velocityUnits::pct);
+      backRight.spin(vex::directionType::fwd, axisFour, vex::velocityUnits::pct);
+    } else {
+      backLeft.stop(vex::brakeType::brake);
+      backRight.stop(vex::brakeType::brake);
+      frontLeft.stop(vex::brakeType::brake);
+      frontRight.stop(vex::brakeType::brake);
+    }
+  } else {
+    // Drive code normal
+    if((abs(Controller1.Axis4.value()) > 10) || (abs(Controller1.Axis3.value()) > 10)){ 
+      // Forward moves robot forward; backward moves robot backward; right rotates robot right; left rotates robot left
+      int leftSideValue = Controller1.Axis3.value() + Controller1.Axis4.value();
+      leftSideValue = .0001*pow(leftSideValue,3);
+      int rightSideValue = Controller1.Axis3.value() - Controller1.Axis4.value();
+      rightSideValue = .0001*pow(rightSideValue,3);
+
+      backLeft.spin(vex::directionType::fwd, leftSideValue, vex::velocityUnits::pct);
+      frontLeft.spin(vex::directionType::fwd, leftSideValue, vex::velocityUnits::pct);
+      backRight.spin(vex::directionType::fwd, rightSideValue, vex::velocityUnits::pct);
+      frontRight.spin(vex::directionType::fwd, rightSideValue, vex::velocityUnits::pct);
+    } else {
+      //If nothing is pressed, robot stops
+      backLeft.stop(vex::brakeType::brake);
+      backRight.stop(vex::brakeType::brake);
+      frontLeft.stop(vex::brakeType::brake);
+      frontRight.stop(vex::brakeType::brake);
+    }  
+  }
+}
+
+
+
+void manualLiftControl(){ 
+  //L1 lifts dr4b; R1 lowers dr4b; pressing B holds the lift in place
+  if ((Controller1.Axis2.value()) > 30){
+    armLeft.spin(vex::directionType::fwd, -2*Controller1.Axis2.value(), vex::velocityUnits::pct);
+    armRight.spin(vex::directionType::fwd, -2*Controller1.Axis2.value(), vex::velocityUnits::pct);
+    armBottom.spin(vex::directionType::fwd, -2*Controller1.Axis2.value(), vex::velocityUnits::pct);
+  } 
+  else if((Controller1.Axis2.value()) < -30){
+    armLeft.spin(vex::directionType::fwd, -0.25*Controller1.Axis2.value(), vex::velocityUnits::pct);
+    armRight.spin(vex::directionType::fwd, -0.25*Controller1.Axis2.value(), vex::velocityUnits::pct);
+    armBottom.spin(vex::directionType::fwd, -0.25*Controller1.Axis2.value(), vex::velocityUnits::pct);
+  }
+  else {
+    armLeft.stop(vex::brakeType::hold);
+    armRight.stop(vex::brakeType::hold);
+    armBottom.stop(vex::brakeType::hold);
+  }
+}
+
+
+
+void manualClawControl(){ // L2 opens claw; R2 closes claw
+  if (Controller1.ButtonL1.pressing()){
+    claw.spin(vex::directionType::fwd, 50, vex::velocityUnits::pct);
+  } 
+   else if (Controller1.ButtonR1.pressing()){
+    claw.spin(vex::directionType::fwd, -50, vex::velocityUnits::pct);
+  } 
+   else {
+    claw.stop(vex::brakeType::hold);
+  }
+}
+ 
+
+
+void stopAllMotors(){
+  frontLeft.stop();
+  backLeft.stop();
+  frontRight.stop();
+  backRight.stop();
+  armLeft.stop();
+  armRight.stop();
+  armBottom.stop();
+  claw.stop();
+}
+
+
+
+void pre_auton(void) {
+  // Initializing Robot Configuration. DO NOT REMOVE!
+  vexcodeInit();
+  frontLeft.stop(vex::brakeType::brake);
+  backLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  armLeft.stop(vex::brakeType::brake);
+  armRight.stop(vex::brakeType::brake);
+  armBottom.stop(vex::brakeType::brake);
+  claw.stop(vex::brakeType::brake);
+  // All activities that occur before the competition starts
+  // Example: clearing encoders, setting servo positions, ...
+}
+
+
+
+void autoDrivePID (int e) {
+  float kP = .125;
+  float kD = 10000;
+  float PIDcorrection;
+  float error;
+  float debug;
+  float totalError;
+  float derivative;
+  backRight.resetRotation();
+  while(fabs(backRight.rotation(rotationUnits::deg)) < abs(e)){
+    error = backRight.rotation(rotationUnits::deg) - e;
+    PIDcorrection = error * kP;
+    if(fabs(error) < 50){
+      if(e > 0)
+        PIDcorrection = -10;
+      if(e < 0)
+        PIDcorrection = 10;
+    }
+    frontLeft.spin(directionType::fwd, -PIDcorrection, velocityUnits::pct);
+    backLeft.spin(directionType::fwd, -PIDcorrection, velocityUnits::pct);
+    frontRight.spin(directionType::fwd, -PIDcorrection, velocityUnits::pct);
+    backRight.spin(directionType::fwd, -PIDcorrection, velocityUnits::pct);
+      debug = backRight.rotation(rotationUnits::deg);
+      task::sleep(1);
+  }
+  frontLeft.stop();
+  backLeft.stop();
+  frontRight.stop();
+  backRight.stop();
+}
+
+
+
+void autoDriveTime(int FrontLeft,int BackLeft,int FrontRight,int BackRight, int t){
+  backLeft.spin(vex::directionType::fwd, BackLeft, vex::velocityUnits::pct);
+  frontLeft.spin(vex::directionType::fwd, FrontLeft, vex::velocityUnits::pct);
+  backRight.spin(vex::directionType::fwd, BackRight, vex::velocityUnits::pct);
+  frontRight.spin(vex::directionType::fwd, FrontRight, vex::velocityUnits::pct);
+  vex::task::sleep(t);
+  backLeft.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  frontLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  vex::task::sleep(250);
+}
+
+// Start of autonomous index
+
+// Big blue zone
+int bB[750][8] = {};
+
+// Big red zone
+int bR[750][8] = {};
+
+// Small zones on
+// both sides
+int sA[750][8] = {};
+
+// End of autonomous index
+
+
+
+void runMappedAuto(int start, int finish, int auton[750][8]){
+  int i = start;
+  while(i < finish){
+    if(auton[i][0] != 0){
+      frontLeft.spin(vex::directionType::fwd, auton[i][0], vex::velocityUnits::pct);
+    } else {
+      frontLeft.stop();
+    }
+
+    if(auton[i][1] != 0){
+      backLeft.spin(vex::directionType::fwd, auton[i][1], vex::velocityUnits::pct);
+    } else {
+      backLeft.stop();
+    }
+
+    if(auton[i][2] != 0){
+      frontRight.spin(vex::directionType::fwd, auton[i][2], vex::velocityUnits::pct);
+    } else {
+      frontRight.stop();
+    }
+
+    if(auton[i][3] != 0){
+      backRight.spin(vex::directionType::fwd, auton[i][3], vex::velocityUnits::pct);
+    } else {
+      backRight.stop();
+    }
+
+    if(auton[i][4] != 0){
+      armLeft.spin(vex::directionType::fwd, auton[i][4], vex::velocityUnits::pct);
+    } else {
+      armLeft.stop();
+    }
+
+    if(auton[i][5] != 0){
+      armRight.spin(vex::directionType::fwd, auton[i][5], vex::velocityUnits::pct);
+    } else {
+      armRight.stop();
+    }
+
+    if(auton[i][6] != 0){
+      armBottom.spin(vex::directionType::fwd, auton[i][6], vex::velocityUnits::pct);
+    } else {
+      armBottom.stop();
+    }
+
+    if(auton[i][7] != 0){
+      claw.spin(vex::directionType::fwd, auton[i][6], vex::velocityUnits::pct);
+    } else {
+      claw.stop();
+    }
+    vex::task::sleep(20);
+    i++;
+  }
+}
+
+
+
+void autoRerun(){
+  frontLeft.stop(vex::brakeType::brake);
+  backLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  armLeft.stop(vex::brakeType::brake);
+  armRight.stop(vex::brakeType::brake);
+  armBottom.stop(vex::brakeType::brake);
+  claw.stop(vex::brakeType::brake);
+  runMappedAuto(0, 750, bB);
+}
+
+
+
+void onePointAutoGoingRight(){
+  autoDriveTime(40, -40, -40, 40, 1000);
+  autoDriveTime(-100, 100, 100, -100, 500);
+  frontLeft.stop(vex::brakeType::brake);
+  backLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  armLeft.stop(vex::brakeType::brake);
+  armRight.stop(vex::brakeType::brake);
+  armBottom.stop(vex::brakeType::brake);
+  claw.stop(vex::brakeType::brake);
+}
+
+
+
+void onePointAutoGoingLeft(){
+  autoDriveTime(-40, 40, 40, -40, 1000);
+  autoDriveTime(100, -100, -100, 100, 500);
+  frontLeft.stop(vex::brakeType::brake);
+  backLeft.stop(vex::brakeType::brake);
+  frontRight.stop(vex::brakeType::brake);
+  backRight.stop(vex::brakeType::brake);
+  armLeft.stop(vex::brakeType::brake);
+  armRight.stop(vex::brakeType::brake);
+  armBottom.stop(vex::brakeType::brake);
+  claw.stop(vex::brakeType::brake);
+}
+
+
+
+void autonomous(void) {
+  onePointAutoGoingRight();
+}
+
+
+
+void usercontrol(void) {
+  // User control code here, inside the loop
+  while (1) {
+    // This is the main execution loop for the user control program.
+    // Each time through the loop your program should update motor + servo
+    // values based on feedback from the joysticks.
+
+    // ........................................................................
+    // Insert user code here. This is where you use the joystick values to
+    // update your motors, etc.
+    // ........................................................................
+    newManualDriveControl();
+    manualLiftControl();
+    manualClawControl();
+
+    vex::task::sleep(20); // Sleep the task for a short amount of time to
+                    // prevent wasted resources.
+  }
+}
+
+
+//
+// Main will set up the competition functions and callbacks.
+//
+int main() {
+  // Set up callbacks for autonomous and driver control periods.
+  Competition.autonomous(autonomous);
+  Competition.drivercontrol(usercontrol);
+
+  // Run the pre-autonomous function.
+  pre_auton();
+
+  // Prevent main from exiting with an infinite loop.
+  while (true) {
+    vex::task::sleep(1);
+  }
+}
